@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
@@ -20,6 +21,7 @@ func main() {
 	var name string
 	var namespace string
 	var bodyFile string
+	var bodyStdIn bool
 	var priority int
 	var repeat int
 
@@ -27,6 +29,7 @@ func main() {
 	f.StringVar(&name, "n", "", "Specify queue/topic name. ")
 	f.StringVar(&namespace, "ns", "", "Specify servicebus namespace name (e.g myns)")
 	f.StringVar(&bodyFile, "f", "", "Specify file for message body")
+	f.BoolVar(&bodyStdIn, "stdin", false, "Specify that message body comes from standard in")
 	f.IntVar(&priority, "p", 0, "Specify priority, default is no priority")
 	f.IntVar(&repeat, "rep", 1, "Specify the number of times to send message, default is 1")
 
@@ -43,14 +46,31 @@ func main() {
 		println("service bus namespace is required")
 		os.Exit(1)
 	}
-	if bodyFile == "" {
+	if !bodyStdIn && bodyFile == "" {
 		println("path to message body file is required")
 		os.Exit(1)
 	}
 
-	data, err := os.ReadFile(bodyFile)
-	if err != nil {
-		panic(err)
+	var data []byte
+
+	if bodyStdIn {
+
+		println("reading message body from standard in")
+
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			//fmt.Println(scanner.Text())
+			data = append(data, []byte(scanner.Text())...)
+		}
+
+		println("read message body from stdin")
+
+	} else {
+
+		data, err = os.ReadFile(bodyFile)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	credential, err := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{ClientOptions: policy.ClientOptions{Logging: policy.LogOptions{IncludeBody: true}}})
